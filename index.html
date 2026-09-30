@@ -1087,6 +1087,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   <div class="chips morechips" id="bgMore" hidden></div>
 
   <label class="wetrow"><input type="checkbox" id="wetToggle"><span><b>Wet weather</b><span class="sub">Hides rough trails and unexplored paths, and keeps routes off them</span></span></label>
+  <label class="wetrow"><input type="checkbox" id="ndeToggle"><span><b>No dead ends</b><span class="sub">Fades paths that lead nowhere and keeps routes off them</span></span></label>
 
   <h3>Detail</h3>
   <div class="seg" id="detail">
@@ -1541,6 +1542,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   }
 
   groups.notes = L.layerGroup();
+  groups.dead = L.layerGroup();
   groups.tracks = L.layerGroup();
 
   // ================= place names =================
@@ -1690,18 +1692,18 @@ svg.leaflet-image-layer.leaflet-interactive path {
 
   // ================= visibility, detail, key =================
   // roads are drawn over paths: where there is road, the road wins
-  const ORDER = ['contours', 'streams', 'unconfirmed', 'offroad', 'walkable', 'cars', 'roads', 'tracks', 'symbols', 'notes', 'labels'];
+  const ORDER = ['contours', 'streams', 'unconfirmed', 'offroad', 'walkable', 'dead', 'cars', 'roads', 'tracks', 'symbols', 'notes', 'labels'];
   const visible = new Set(DETAIL.standard);
   let detail = 'standard';
 
   function applyVisibility() {
     ORDER.forEach(id => {
-      const on = visible.has(id);
+      const on = id === 'dead' ? noDead : visible.has(id);
       if (on && !map.hasLayer(groups[id])) groups[id].addTo(map);
       if (!on && map.hasLayer(groups[id])) groups[id].remove();
     });
     // keep canvas order stable: re-add in order so paths draw above water and roads
-    ORDER.forEach(id => { if (visible.has(id)) groups[id].eachLayer(l => l.bringToFront && l.bringToFront()); });
+    ORDER.forEach(id => { if (id === 'dead' ? noDead : visible.has(id)) groups[id].eachLayer(l => l.bringToFront && l.bringToFront()); });
     // your planned route and any highlighted path always sit on top of the paths
     [routeLayer, infoLayer].forEach(g => { if (g) (g.eachLayer ? g.eachLayer(l => l.bringToFront && l.bringToFront()) : g.bringToFront()); });
     document.querySelectorAll('#key input').forEach(i => i.checked = visible.has(i.dataset.id));
@@ -1782,7 +1784,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   // ================= remember choices on this device =================
   let wet = false;
   function save() {
-    try { localStorage.setItem('kilbroney.view', JSON.stringify({ bg: currentBg, visible: [...visible], names: nameMode, wet, hiddenSym: [...hiddenSym], theme: themeMode, orient: orientMode, v4: true, v5: true })); } catch (e) {}
+    try { localStorage.setItem('kilbroney.view', JSON.stringify({ bg: currentBg, visible: [...visible], names: nameMode, wet, hiddenSym: [...hiddenSym], theme: themeMode, orient: orientMode, noDead, v4: true, v5: true })); } catch (e) {}
   }
   function load() {
     try {
@@ -1791,6 +1793,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       if (v && !v.v4) { visible.add('notes'); visible.add('tracks'); }
       if (v && v.v5 && ['auto', 'light', 'dark'].includes(v.theme)) themeMode = v.theme;
       if (v && v.wet) wet = true;
+      if (v && v.noDead) noDead = true;
       if (v && Array.isArray(v.hiddenSym)) v.hiddenSym.forEach(k => hiddenSym.add(k));
       return v && v.bg;
     } catch (e) { return null; }
@@ -1802,7 +1805,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if (on && !wet) unexploredBeforeWet = visible.has('unconfirmed');
     wet = on;
     document.getElementById('wetToggle').checked = on;
-    document.getElementById('wetChip').hidden = !on;
+    updateChip();
     // wet weather hides rough trails and unexplored paths; turning it off puts unexplored paths back if they were showing
     if (on) { visible.delete('offroad'); visible.delete('unconfirmed'); }
     else { if (detail !== 'simple') visible.add('offroad'); if (unexploredBeforeWet) visible.add('unconfirmed'); unexploredBeforeWet = false; }
@@ -1814,10 +1817,17 @@ svg.leaflet-image-layer.leaflet-interactive path {
         refreshPlan();
       }
     }
+    if (noDead) computeDead();
     applyVisibility();
   }
   document.getElementById('wetToggle').addEventListener('change', e => setWet(e.target.checked));
   document.getElementById('wetChip').onclick = () => openSheet(true);
+  function updateChip() {
+    const c = document.getElementById('wetChip');
+    c.hidden = !wet && !noDead;
+    c.textContent = wet && noDead ? 'Wet weather, no dead ends' : wet ? 'Wet weather: rough and unexplored paths hidden' : 'No dead ends';
+  }
+  document.getElementById('ndeToggle').addEventListener('change', e => setNoDead(e.target.checked));
 
   // ================= toast =================
   const toastEl = document.getElementById('toast'); let toastTimer;
@@ -1909,9 +1919,87 @@ svg.leaflet-image-layer.leaflet-interactive path {
   for (let i = 0; i < GRAPH.e.length; i += 3) {
     const a = GRAPH.e[i], b = GRAPH.e[i + 1], t = GRAPH.e[i + 2];
     const len = Math.hypot(NX[a] - NX[b], NY[a] - NY[b]) * MPP;
-    ADJ[a].push({ to: b, len, t }); ADJ[b].push({ to: a, len, t });
+    const id = i / 3; ADJ[a].push({ to: b, len, t, id }); ADJ[b].push({ to: a, len, t, id });
   }
   const PACE = GRAPH.pace;
+
+  // ================= No dead ends =================
+  // ways out: car parks, driving roads and the map edge, except junctions you marked as dead ends
+  const NOT_EXITS = [[65, 1773], [829, 1712], [2883, 1562], [3229, 1640], [3224, 1641], [3257, 1672], [3261, 1731]];
+  const EXIT = new Uint8Array(NN);
+  (() => {
+    const cars = SYMBOLS.filter(s => s.k === 'car'), segs = [];
+    VEC.roads.forEach(f => { for (let i = 0; i + 3 < f.length; i += 2) segs.push([f[i], f[i + 1], f[i + 2], f[i + 3]]); });
+    for (let i = 0; i < NN; i++) {
+      const x = NX[i], y = NY[i];
+      let ex = x < 20 || y < 20 || x > GEO.w - 20 || y > GEO.h - 20 || cars.some(c => Math.hypot(c.x - x, c.y - y) < 30);
+      if (!ex) ex = segs.some(s => Math.min(s[0], s[2]) - 8 < x && x < Math.max(s[0], s[2]) + 8 && Math.min(s[1], s[3]) - 8 < y && y < Math.max(s[1], s[3]) + 8 && segDist(x, y, s[0], s[1], s[2], s[3]) <= 7);
+      if (ex && NOT_EXITS.some(([px, py]) => Math.hypot(px - x, py - y) < 8)) ex = false;
+      EXIT[i] = ex ? 1 : 0;
+    }
+  })();
+  let noDead = false, deadBypass = false;
+  const DEAD = new Uint8Array(GRAPH.e.length / 3);
+  // trims away path ends that lead nowhere, again and again, until only paths with a way through are left
+  function computeDead() {
+    DEAD.fill(0);
+    if (noDead) {
+      const roughOk = plan.opts.rough && !wet;
+      const alive = new Uint8Array(DEAD.length);
+      for (let k = 0; k < alive.length; k++) alive[k] = GRAPH.e[3 * k + 2] === 2 && !roughOk ? 0 : 1;
+      const queue = []; for (let i = 0; i < NN; i++) queue.push(i);
+      const inQ = new Uint8Array(NN).fill(1);
+      while (queue.length) {
+        const v = queue.pop(); inQ[v] = 0;
+        if (EXIT[v]) continue;
+        const live = ADJ[v].filter(e => alive[e.id]);
+        if (!live.length) continue;
+        const nb = new Set(live.map(e => e.to)); nb.delete(v);   // a piece doubling back on itself is not a way through
+        if (nb.size <= 1 && live.every(e => e.t !== 1)) live.forEach(e => { alive[e.id] = 0; if (!inQ[e.to]) { inQ[e.to] = 1; queue.push(e.to); } });
+      }
+      for (let k = 0; k < DEAD.length; k++) if (!alive[k] && !(GRAPH.e[3 * k + 2] === 2 && !roughOk)) DEAD[k] = 1;
+    }
+    drawDead();
+  }
+  // faded look: dead-end paths drawn grey over the path, chained into continuous lines
+  const DEAD_STY = { light: [{ color: '#ffffff', w: 11, min: 4 }, { color: '#c4c4c4', w: 7, min: 2.8 }], dark: [{ color: '#111111', w: 11, min: 4 }, { color: '#5a5a5a', w: 7, min: 2.8 }] };
+  let deadLines = [];
+  function drawDead() {
+    groups.dead.clearLayers();
+    const old = new Set(deadLines); for (let i = styled.length - 1; i >= 0; i--) if (old.has(styled[i][0])) styled.splice(i, 1);
+    deadLines = [];
+    if (!noDead) return;
+    const used = new Uint8Array(DEAD.length), chains = [];
+    const deadAt = v => ADJ[v].filter(e => DEAD[e.id]);
+    for (let k = 0; k < DEAD.length; k++) {
+      if (!DEAD[k] || used[k]) continue;
+      used[k] = 1;
+      const a = GRAPH.e[3 * k], b = GRAPH.e[3 * k + 1], chain = [a, b];
+      for (const dir of [1, 0]) {
+        let v = dir ? b : a;
+        for (;;) {
+          const nx = deadAt(v).filter(e => !used[e.id]);
+          if (deadAt(v).length !== 2 || nx.length !== 1) break;
+          used[nx[0].id] = 1; v = nx[0].to; dir ? chain.push(v) : chain.unshift(v);
+        }
+      }
+      chains.push(chain.map(n => ll(NX[n], NY[n])));
+    }
+    if (!chains.length) return;
+    DEAD_STY.light.forEach((sp, i) => {
+      const p = L.polyline(chains, { renderer, color: sp.color, lineCap: 'butt', lineJoin: 'round', interactive: false });
+      groups.dead.addLayer(p); styled.push([p, sp, DEAD_STY.dark[i]]); deadLines.push(p);
+    });
+    restyle();
+  }
+  function setNoDead(on) {
+    noDead = on;
+    document.getElementById('ndeToggle').checked = on;
+    updateChip(); computeDead();
+    if (on && plan.wps.length && !computeRoute()) { deadBypass = true; computeRoute(); deadBypass = false; toast('Your current route includes dead ends, so it stays as it is.', 5000); }
+    if (typeof refreshPlan === 'function') refreshPlan();
+    applyVisibility(); save();
+  }
   // our own pace on each slope, as a share of their flat pace (from their GPS walks)
   const PACE_CURVE = [[-28.5,.71],[-25.5,.74],[-22.5,.78],[-19.5,.85],[-16.5,.90],[-13.5,.93],[-10.5,.96],[-7.5,.99],[-4.5,1],[-1.5,1],[1.5,.99],[4.5,.97],[7.5,.91],[10.5,.84],[13.5,.81],[16.5,.76],[19.5,.69],[22.5,.60],[25.5,.52],[28.5,.48]];
   function paceFactor(g) {
@@ -1929,7 +2017,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   const BAND_COL = ['#23b35a', '#ffab00', '#e8303a'];
   const BAND_NAME = ['gentle', 'moderate', 'steep'];
 
-  const usable = (i, opts) => !opts || ADJ[i].some(e => e.t === 0 || (e.t === 1 && opts.roads) || (e.t === 2 && opts.rough));
+  const usable = (i, opts) => !opts || ADJ[i].some(e => (e.t === 0 || (e.t === 1 && opts.roads) || (e.t === 2 && opts.rough)) && !(noDead && !deadBypass && DEAD[e.id]));
   function nearestNode(x, y, maxPx, opts) {
     let best = -1, bd = maxPx * maxPx;
     for (let i = 0; i < NN; i++) {
@@ -1954,6 +2042,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
       for (const e of ADJ[u]) {
         if (e.t === 1 && !opts.roads) continue;
         if (e.t === 2 && !opts.rough) continue;
+        if (noDead && !deadBypass && DEAD[e.id]) continue;
         const nd = d + e.len;
         if (nd < dist[e.to]) { dist[e.to] = nd; prev[e.to] = u; push([nd, e.to]); }
       }
@@ -2492,7 +2581,10 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if (mode !== 'plan' || noteMode) return;
     const [x, y] = unll(e.latlng);
     const maxPx = 36 / Math.pow(2, map.getZoom());
-    const n = nearestNode(x, y, maxPx, plan.opts);
+    let n = nearestNode(x, y, maxPx, plan.opts);
+    // tapping a faded path: head for the nearest point you can walk to, if it is close by
+    if (noDead) { deadBypass = true; const nd = nearestNode(x, y, maxPx, plan.opts); deadBypass = false;
+      if (nd >= 0 && ADJ[nd].every(e => DEAD[e.id] || (e.t === 1 && !plan.opts.roads) || (e.t === 2 && !plan.opts.rough))) { toast('That path is a dead end, and No dead ends is on.', 3500); return; } }
     if (n < 0) { toast(plan.opts.rough ? 'Tap closer to a walkable path.' : 'Tap closer to a walkable path. Rough trails are switched off.', 3000); return; }
     plan.wps.push({ node: n, x: NX[n], y: NY[n] });
     if (!computeRoute()) {
@@ -2537,7 +2629,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
     if (!computeRoute()) { plan.wps.pop(); computeRoute(); toast('Could not find a way back to the start with these settings.', 4000); }
     refreshPlan();
   };
-  document.getElementById('oRough').onchange = e => { plan.opts.rough = e.target.checked; if (!computeRoute()) { toast('This route needs rough trails.', 3000); plan.opts.rough = true; computeRoute(); } refreshPlan(); };
+  document.getElementById('oRough').onchange = e => { plan.opts.rough = e.target.checked; computeDead(); if (!computeRoute()) { toast('This route needs rough trails.', 3000); plan.opts.rough = true; computeDead(); computeRoute(); } refreshPlan(); };
   document.getElementById('oRoads').onchange = e => { plan.opts.roads = e.target.checked; if (!computeRoute()) { toast('This route needs the walkable roads.', 3000); plan.opts.roads = true; computeRoute(); } refreshPlan(); };
 
   // ================= saved routes =================
@@ -2560,7 +2652,11 @@ svg.leaflet-image-layer.leaflet-interactive path {
     plan.id = r.id || null; plan.name = r.name || '';
     plan.opts = { rough: !!(r.opts && r.opts.rough), roads: !(r.opts && r.opts.roads === false) };
     plan.wps = r.waypoints.map(([x, y]) => { const n = nearestNode(x, y, 60); return { node: n, x: NX[n], y: NY[n] }; }).filter(w => w.node >= 0);
-    if (!computeRoute()) toast('Part of this route could not be followed on the current paths.', 5000);
+    computeDead();
+    if (!computeRoute()) {
+      deadBypass = true; const ok = computeRoute(); deadBypass = false;
+      toast(ok && noDead ? 'This route includes dead ends, shown as it was saved.' : 'Part of this route could not be followed on the current paths.', 5000);
+    }
     if (geo) map.fitBounds(L.latLngBounds(geo.nodes.map(n => ll(NX[n], NY[n]))), { paddingTopLeft: [30, 30], paddingBottomRight: [30, window.innerWidth <= 560 ? 320 : 30] });
   }
   document.getElementById('aSave').onclick = () => {
@@ -2962,6 +3058,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   syncSymKey();
   sizeLabels(); updateScale(); applyVisibility();
   if (wet) setWet(true, true);
+  if (noDead) setNoDead(true);
   syncOrient();
   if (!restorePlace()) readSharedRoute();
 })();
