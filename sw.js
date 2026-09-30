@@ -1,6 +1,6 @@
 // Keeps a full copy of the map on the phone so it works in the forest without signal.
 // Change VERSION whenever the map is updated so phones pick up the new copy.
-const VERSION = 'kilbroney-20260930-2010';
+const VERSION = 'kilbroney-20260930-2054';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
