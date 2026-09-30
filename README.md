@@ -4,7 +4,7 @@ An interactive walking map of Kilbroney Forest and Kilbroney Park, Rostrevor, bu
 
 It includes the official trails, but also forest roads, lesser-known paths and rough trails.
 
-**Open the map:** https://USERNAME.github.io/kilbroney/
+**Open the map:** [https://kishometeora.github.io/kilbroney/](https://kishometeora.github.io/kilbroney/)
 
 ## Features
 
