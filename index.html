@@ -1004,6 +1004,7 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .resetbtn svg { width: 20px; height: 20px; }
   .resetbtn.resetview { top: calc(126px + env(safe-area-inset-top, 0px)); }
   .resetbtn[hidden] { display: none; }
+  #closeBtn:disabled { opacity: .38; cursor: default; box-shadow: none; }
   body.cardup .resetbtn.resetview { display: none; }
   .resetmenu { position: fixed; z-index: 1001; right: calc(68px + env(safe-area-inset-right, 0px)); top: calc(126px + env(safe-area-inset-top, 0px));
     background: var(--forest); color: var(--mist); border-radius: 14px; padding: 6px; box-shadow: 0 6px 24px rgba(0,0,0,.22); display: flex; flex-direction: column; min-width: 220px; }
@@ -1362,7 +1363,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
 <body>
 <div id="map" role="application" aria-label="Map of Kilbroney Forest"></div>
 
-<button class="btn resetbtn" id="closeBtn" aria-label="Close the card" title="Close the card" hidden>
+<button class="btn resetbtn" id="closeBtn" aria-label="Clear the map: close cards, clear the route and highlighted path" title="Clear route and selection">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
 </button>
 <button class="btn resetbtn resetview" id="resetBtn" aria-label="Reset the view" title="Reset the view" aria-haspopup="menu" aria-expanded="false">
@@ -2805,17 +2806,28 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     }
     if (best >= 0) showInfo(best, bn); else closeInfo();
   });
-  // ✕ closes the card and clears what it was showing (the path, or the route); the map stays where it is. Walking is never stopped here.
+  // a card's own ✕ closes the card and keeps what it showed (route or highlighted path), zooming to it
   function closeCard() {
-    if (!info.hidden) { closeInfo(); infoWay = -1; return; }
-    if (mode === 'plan') {
-      if (plan.wps.length && !plan.id && !confirm('Clear your unsaved route?')) return;
-      plan.wps = []; plan.name = ''; plan.id = null; computeRoute(); setMode('closed'); return;
+    if (!info.hidden) {
+      const wid = infoWay; hideInfoCard();
+      if (mode === 'plan' && geo) { setMode('closed'); fitSoon(routePts); }      // path card over a route: close both, show the route
+      else if (wid >= 0) fitSoon(() => wayPts(wid));
+      syncCloseBtn(); return;
     }
-    if (mode === 'list') setMode('closed');
+    if (mode === 'plan' || mode === 'list') { const had = mode === 'plan' && geo; setMode('closed'); if (had) fitSoon(routePts); }
+    syncCloseBtn();
+  }
+  // the top-right ✕ clears everything in one tap: cards, the route and the highlighted path, then shows the whole map
+  function clearAll() {
+    if (nav.active) { if (!confirm('Stop walking this route and clear it from the map?')) return; endWalk(); }
+    else if (plan.wps.length && !plan.id && !confirm('Clear your unsaved route?')) return;
+    closeInfo(); infoWay = -1; map.closePopup();
+    plan.wps = []; plan.name = ''; plan.id = null; computeRoute(); setMode('closed');
+    map.fitBounds(bounds); syncCloseBtn();
   }
   document.getElementById('iClose').onclick = closeCard;
-  document.getElementById('closeBtn').onclick = closeCard;
+  document.getElementById('closeBtn').onclick = clearAll;
+  setInterval(syncCloseBtn, 600);   // keeps the grey/active state right whatever changed the route or highlight
   document.getElementById('iPlan').onclick = () => {
     const n = infoNode; closeInfo();
     if (!plan.opts.rough && !usable(n, plan.opts)) { if (wet) { toast('That is a rough trail. Turn on Hiking to use it.', 4000); return; } plan.opts.rough = true; }
@@ -3208,10 +3220,11 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     }
   }
   window.addEventListener('resize', syncPanelHeight);
-  // the X shows only while a card is open
+  // the top-right X is always there; it greys out when there is nothing to clear
   function syncCloseBtn() {
     const cb = document.getElementById('closeBtn'); if (!cb) return;
-    cb.hidden = !((!panel.hidden && (mode === 'plan' || mode === 'list')) || !info.hidden);
+    cb.hidden = false;
+    cb.disabled = !(nav.active || !info.hidden || infoLayer || geo || plan.wps.length || (!panel.hidden && mode === 'list'));
   }
 
   function refreshPlan() {
