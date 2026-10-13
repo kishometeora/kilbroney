@@ -2823,7 +2823,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     else if (plan.wps.length && !plan.id && !confirm('Clear your unsaved route?')) return;
     closeInfo(); infoWay = -1; map.closePopup();
     plan.wps = []; plan.name = ''; plan.id = null; computeRoute(); setMode('closed');
-    map.fitBounds(bounds); syncCloseBtn();
+    map.stop(); map.fitBounds(bounds, { animate: false })   /* instant: an animated zoom-out across the big background images can crash Safari on iPhone */; syncCloseBtn();
   }
   document.getElementById('iClose').onclick = closeCard;
   document.getElementById('closeBtn').onclick = clearAll;
@@ -4473,7 +4473,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     openSheet(false); openSettings(false); openSkins(false); closeInfo(); map.closePopup();
     if (typeof openSearch === 'function') openSearch(false);
     if (!nav.active) { plan.wps = []; plan.name = ''; plan.id = null; computeRoute(); setMode('closed'); }
-    map.fitBounds(bounds);
+    map.stop(); map.fitBounds(bounds, { animate: false });
   };
   document.getElementById('rmAll').onclick = () => { openResetMenu(false); fullReset(); };
   function fullReset() {
@@ -4496,7 +4496,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     orientMode = 'auto'; syncOrient();
     save();
     if (orientAngle(orientMode) !== ROT) { location.reload(); return; }
-    map.fitBounds(bounds);
+    map.stop(); map.fitBounds(bounds, { animate: false });
     toast('Map reset to its defaults.', 2500);
   }
 
