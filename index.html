@@ -964,6 +964,30 @@ svg.leaflet-image-layer.leaflet-interactive path {
   .cpill { width: 42px; height: 42px; padding: 0 !important; justify-content: center; border-radius: 50% !important; }
   .cpill span { display: none; }
   .cpill svg { width: 24px; height: 24px; opacity: .75; }
+  /* weather: live mini-forecast button (top left) and its card */
+  .cpill.wxpill { width: auto; padding: 0 13px 0 9px !important; border-radius: 999px !important; gap: 4px; }
+  .cpill.wxpill span.wxi { display: inline-flex; }
+  .cpill.wxpill svg { width: 22px; height: 22px; opacity: .95; }
+  .wxpill b { font: 600 14px Manrope, -apple-system, sans-serif; font-variant-numeric: tabular-nums; }
+  .wxpill.wxold b { opacity: .55; }
+  .sheet.wxsheet { left: calc(12px + env(safe-area-inset-left, 0px)); right: auto; top: calc(64px + env(safe-area-inset-top, 0px)); bottom: auto; width: 360px; }
+  @media (max-width: 560px) { .sheet.wxsheet { left: 0; right: 0; top: auto; bottom: 0; width: auto; } }
+  .wxtabs { display: flex; gap: 6px; margin: 0 0 8px; }
+  .wxtabs button { flex: 1; font: 600 13px system-ui, -apple-system, sans-serif; color: var(--mist); background: var(--forest-2); border: 0; border-radius: 10px; padding: 7px 4px; cursor: pointer; line-height: 1.2; }
+  .wxtabs button small { display: block; font-weight: 400; font-size: 11px; color: var(--sage); }
+  .wxtabs button[aria-selected="true"] { background: var(--path); color: #fff; }
+  .wxtabs button[aria-selected="true"] small { color: #fff; opacity: .85; }
+  .wxstatus { font-size: 12.5px; color: var(--sage); margin: 0 0 6px; }
+  .wxstatus .wxns { color: #e0892a; font-weight: 600; }
+  .wxtable { width: 100%; border-collapse: collapse; font-size: 13.5px; color: var(--mist); font-variant-numeric: tabular-nums; }
+  .wxtable th { font-size: 11.5px; font-weight: 600; color: var(--sage); text-align: left; padding: 2px 4px 5px; }
+  .wxtable td { padding: 5px 4px; border-top: 1px solid rgba(127,127,127,.18); vertical-align: middle; }
+  .wxtable td small { display: block; font-size: 11px; color: var(--sage); }
+  .wxtable .wxic svg { width: 26px; height: 26px; display: block; }
+  .wxtable .wxwet { color: #4aa3df; font-weight: 600; }
+  .wxarrow { display: inline-block; width: 11px; height: 11px; margin-left: 3px; vertical-align: -1px; }
+  .wxcredit { font-size: 11px; color: var(--sage); margin: 10px 0 0; }
+  .wxcredit a { color: inherit; }
   .cpill[aria-pressed="true"] { background: var(--path); color: #fff; }
   .cpill[aria-pressed="true"] svg { opacity: 1; }
   .wetchip { display: none !important; }
@@ -1384,11 +1408,19 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   <p class="h3sub skinsub">Standard themes stay accurate. Novelty themes are just for fun.</p>
   <div class="skingrid" id="skinGrid"></div>
 </div>
+<div class="sheet wxsheet" id="wxSheet" hidden>
+  <h2>Weather <button id="closeWx">Done</button></h2>
+  <div class="wxtabs" role="tablist" id="wxTabs"></div>
+  <p class="wxstatus" id="wxStatus"></p>
+  <div id="wxBody"></div>
+  <p class="wxcredit">Weather data: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a></p>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <div class="topleft">
   <button class="searchpill" id="searchBtn" aria-label="Search places, routes and notes">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg><span>Search</span>
   </button>
+  <button class="cpill wxpill" id="wxBtn" aria-expanded="false" aria-label="Weather forecast" title="Weather"><span class="wxi" id="wxBtnIcon"></span><b id="wxBtnTemp">–</b></button>
   <button class="cpill" id="cpWet" aria-pressed="false" aria-label="Hiking: shows rough trails and lets routes use them" title="Hiking">
     <svg viewBox="0 0 24 24"><circle cx="13.2" cy="3.4" r="2.1" fill="currentColor"/><path d="M8.2 7.6l3.4-1 1.9 6.6-3.4 1z" fill="currentColor"/><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 6.6 11.6 13"/><path d="M11.6 13l2.6 4.2.9 4.6M11.6 13l-2 4.1-1.6 4.6"/><path d="M12.4 8.6l2.6 2.7 1.6.2"/></g><path d="M17.2 9.2 18.9 22" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Hiking</span>
   </button>
@@ -1513,6 +1545,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     <p class="scrubinfo" id="profileInfo"></p>
     <div class="summary" id="summary" hidden>
       <div class="srow sdiffrow"><span class="diff" id="sDiff"></span><span id="sSteepest"></span></div>
+      <div class="srow" id="gateRow" hidden><span id="sGateWarn" class="sunwarn"></span></div>
     </div>
     <p class="hint" id="hint"></p>
     <div class="acts">
@@ -1532,6 +1565,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
       <div class="summary">
         <div class="srow"><label class="startat">Walk on <input type="date" id="sDate"></label><label class="startat">at <input type="time" id="sStart"></label></div>
         <div class="srow"><span id="sSun"></span></div>
+        <div class="srow"><span id="sGate"></span></div>
         <div class="srow"><span id="sHills"></span></div>
       </div>
       <p class="steepnote"><span class="bkey"><i style="background:#23b35a"></i>gentle <i style="background:#ffab00"></i>moderate <i style="background:#e8303a"></i>steep</span> <span id="steepNote"></span></p>
@@ -1670,6 +1704,8 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   const WALKS = { a: [], b: [] };
   // points of interest: car parks, masts and the Stone from the hand-drawn map; the rest from the OS map symbols
   const SYMBOLS = [
+    // gates and stiles on the paths and forest roads (OpenStreetMap, Oct 2026); vehicle gates lock when the park closes
+    { k: 'gate', icon: 'wgate', x: 68.2, y: 1739.9, gate: 'walker', osm: 5128175060 }, { k: 'gate', icon: 'wgate', x: 762.4, y: 1280.9, gate: 'walker', osm: 857727484 }, { k: 'gate', icon: 'stile', x: 2106.6, y: 1212.4, gate: 'stile', osm: 1878417490 }, { k: 'gate', icon: 'wgate', x: 2211.5, y: 323.4, gate: 'walker', osm: 1120706619 }, { k: 'gate', icon: 'wgate', x: 2887.8, y: 1561.0, gate: 'walker', osm: 2485473895 }, { k: 'gate', icon: 'stile', x: 3265.4, y: 652.8, gate: 'ladder', osm: 1153638272 }, { k: 'gate', icon: 'wgate', x: 3363.2, y: 1347.3, gate: 'walker', osm: 1123428736 }, { k: 'gate', icon: 'wgate', x: 3489.4, y: 1441.6, gate: 'walker', osm: 3726016317 }, { k: 'gate', icon: 'gate', x: 3495.6, y: 1461.8, gate: 'vehicle', osm: 8109172802 }, { k: 'gate', icon: 'wgate', x: 3517.7, y: 923.6, gate: 'walker', osm: 1123428934 }, { k: 'gate', icon: 'gate', x: 3529.8, y: 1455.4, gate: 'vehicle', osm: 8107502742 }, { k: 'gate', icon: 'gate', x: 3551.0, y: 1528.0, gate: 'vehicle', osm: 728052872 }, { k: 'gate', icon: 'gate', x: 3554.6, y: 1425.6, gate: 'vehicle', osm: 12332794882 }, { k: 'gate', icon: 'wgate', x: 3573.6, y: 859.4, gate: 'walker', osm: 1123463415 }, { k: 'gate', icon: 'gate', x: 3604.9, y: 1483.0, gate: 'vehicle', osm: 11114880896 }, { k: 'gate', icon: 'gate', x: 3606.2, y: 1669.1, gate: 'vehicle', osm: 701381444 }, { k: 'gate', icon: 'wgate', x: 3679.2, y: 1162.2, gate: 'walker', osm: 5906382891 }, { k: 'gate', icon: 'stile', x: 3743.6, y: 1488.6, gate: 'stile', osm: 10719499976 }, { k: 'gate', icon: 'gate', x: 3756.0, y: 1509.0, gate: 'vehicle', osm: 11114880893 }, { k: 'gate', icon: 'wgate', x: 3781.2, y: -82.9, gate: 'walker', osm: 790462822 }, { k: 'gate', icon: 'wgate', x: 3951.1, y: 2186.1, gate: 'walker', osm: 9681993854 }, { k: 'gate', icon: 'stile', x: 4016.3, y: 518.4, gate: 'stile', osm: 790462401 }, { k: 'gate', icon: 'stile', x: 4106.0, y: 491.0, gate: 'stile', osm: 790462538 }, { k: 'gate', icon: 'wgate', x: 4142.8, y: -247.4, gate: 'walker', osm: 13535430791 }, { k: 'gate', icon: 'wgate', x: 4311.4, y: -228.9, gate: 'walker', osm: 13535430775 }, { k: 'gate', icon: 'wgate', x: 4337.8, y: 820.2, gate: 'walker', osm: 13535337701 }, { k: 'gate', icon: 'wgate', x: 4434.1, y: 140.4, gate: 'walker', osm: 13535430748 }, { k: 'gate', icon: 'wgate', x: 4446.2, y: 113.9, gate: 'walker', osm: 13535430749 },
     { k: 'car', x: 3547, y: 893 }, { k: 'car', x: 3690, y: 1447 }, { k: 'car', x: 3555, y: 1499 },
     { k: 'car', x: 3722, y: 1547 }, { k: 'car', x: 3633, y: 1659 }, { k: 'car', x: 983, y: 1686 },
     { k: 'view', x: 3752, y: 1048, n: 'Cloughmore Stone' },
@@ -1969,15 +2005,30 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     mast: B('#8e8e93', '<g fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"><path d="M16 13 11.5 25M16 13l4.5 12M13 21.5h6M14.2 18h3.6"/><path d="M12.6 10.3a4.6 4.6 0 0 0 0 5.2M19.4 10.3a4.6 4.6 0 0 1 0 5.2M10.3 8.5a7.8 7.8 0 0 0 0 8.8M21.7 8.5a7.8 7.8 0 0 1 0 8.8"/></g><circle cx="16" cy="13" r="1.6" fill="#000"/>'),
     cafe: B('#8b5e3c', '<path d="M8.5 13h11v4.5a4.5 4.5 0 0 1-4.5 4.5h-2a4.5 4.5 0 0 1-4.5-4.5Z" fill="#fff"/><path d="M19.5 14.5h1.2a2.3 2.3 0 0 1 0 4.6h-1.6" fill="none" stroke="#fff" stroke-width="1.8"/><path d="M11.5 8.5c0 1.2 1.2 1.2 1.2 2.4M15 8.5c0 1.2 1.2 1.2 1.2 2.4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>'),
     pub: B('#c98a1c', '<path d="M10 9h11l-1.4 13.5a1.6 1.6 0 0 1-1.6 1.5h-5a1.6 1.6 0 0 1-1.6-1.5Z" fill="#fff"/><path d="M10.4 12.5h10.2" stroke="#c98a1c" stroke-width="1.6"/>'),
+    gate: B('#b23a2e', '<path d="M8 9v15M24 9v15M8 12.5h16M8 17h16M8 21.5h16M8 12.5l16 9" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>'),
+    wgate: B('#2f7de1', '<path d="M10 10v14M22 10v14M10 13h12M10 17.5h12M10 22h12" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>'),
+    stile: B('#8a5a2b', '<path d="M9 8v16M23 8v16M9 13h14M9 19h14M13 24v-5M19 24v-5" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>'),
     hill: B('#a2845e', '<path d="M6 23 13.5 10l4 6.5 2.5-3.5L26 23Z" fill="#fff"/>'),
     water: B('#32ade6', '<path d="M16 7c3.5 5 6 8.3 6 11.3a6 6 0 0 1-12 0C10 15.3 12.5 12 16 7Z" fill="#fff"/>'),
     place: B('#8e8e93', '<circle cx="16" cy="16" r="5" fill="#fff"/>'),
     stone: '<svg viewBox="0 0 32 32"><path d="M4 19c-1-5.5 3-11 9-12.1 4.2-.7 8.8-.4 11.9 2.1 3.1 2.5 3.8 6.9 2.6 10.7-1.1 3.7-4.6 6.1-9.3 6.3-4 .2-8.7.2-11.4-1.7C5.2 23.1 4.3 21.1 4 19Z" fill="#cfd2cc" stroke="#000" stroke-width="2.6"/><path d="M9.5 13c2.2-1.6 4.8-2.2 7.4-1.9" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>'
   };
-  const SYMBOL_NAMES = { car: 'Car park', wc: 'Toilets', info: 'Information', picnic: 'Picnic site', view: 'Viewpoint', tree: 'Notable trees', trail: 'Waymarked trails start', bridge: 'Footbridge', mast: 'Mast', stone: 'Cloughmore Stone', hill: 'Hills', water: 'Water', place: 'Places', cafe: 'Cafés', pub: 'Pubs' };
+  const SYMBOL_NAMES = { car: 'Car park', wc: 'Toilets', info: 'Information', picnic: 'Picnic site', view: 'Viewpoint', tree: 'Notable trees', trail: 'Waymarked trails start', bridge: 'Footbridge', mast: 'Mast', stone: 'Cloughmore Stone', hill: 'Hills', water: 'Water', place: 'Places', cafe: 'Cafés', pub: 'Pubs', gate: 'Gates and stiles' };
   // which symbol wins when two would overlap, and the zoom they first appear at
-  const SYMBOL_RANK = { stone: 0, car: 1, view: 2, tree: 2, info: 3, wc: 4, trail: 5, picnic: 6, bridge: 7, mast: 8, hill: 9, water: 10, place: 11, cafe: 3, pub: 4 };
-  const SYMBOL_MINZOOM = { bridge: -0.75, mast: -1.5, picnic: -1.5, wc: -1.75, hill: -1.25, water: -1.25, place: -1.25 };
+  const SYMBOL_RANK = { stone: 0, car: 1, view: 2, tree: 2, info: 3, wc: 4, trail: 5, picnic: 6, bridge: 7, mast: 8, hill: 9, water: 10, place: 11, cafe: 3, pub: 4, gate: 7 };
+  const SYMBOL_MINZOOM = { gate: -0.5, bridge: -0.75, mast: -1.5, picnic: -1.5, wc: -1.75, hill: -1.25, water: -1.25, place: -1.25 };
+  // park opening hours (Visit Mourne): open 9am every day; vehicle gates lock at closing; closed on 25 December
+  function parkHours(d) {
+    if (d.getMonth() === 11 && d.getDate() === 25) return null;
+    const mo = d.getMonth() + 1, close = (mo >= 5 && mo <= 8) ? 21 : (mo === 4 || mo === 9) ? 20 : (mo === 3 || mo === 10) ? 18 : 17;
+    return { open: 9, close };
+  }
+  const ampm = h => (h > 12 ? h - 12 : h) + (h >= 12 ? 'pm' : 'am');
+  function gateText(s, d = new Date()) {
+    if (s.gate !== 'vehicle') return (s.gate === 'ladder' ? 'Ladder stile' : s.gate === 'stile' ? 'Stile' : 'Gate') + ' · walkers, always open';
+    const h = parkHours(d);
+    return h ? 'Vehicle gate · open ' + ampm(h.open) + ', locks at ' + ampm(h.close) + ' today' : 'Vehicle gate · locked all day today (park closed 25 December)';
+  }
   const hiddenSym = new Set();
   const symMarkers = SYMBOLS.map(s => {
     const m = L.marker(ll(s.x, s.y), {
@@ -1988,7 +2039,8 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     // tapping a symbol shows its name; while planning or placing a note the tap goes to the map instead
     m.on('click', ev => {
       if (mode === 'plan' || noteMode) { map.fire('click', { latlng: ev.latlng, originalEvent: ev.originalEvent }); return; }
-      const nm = s.n || SYMBOL_NAMES[s.k].replace(/s$/, '');
+      let nm = s.n || SYMBOL_NAMES[s.k].replace(/s$/, '');
+      if (s.k === 'gate') { L.popup({ className: 'sympop', closeButton: false, offset: [0, -12], autoPanPadding: [30, 60] }).setLatLng(m.getLatLng()).setContent(esc(gateText(s))).openOn(map); return; }
       const label = s.k === 'car' && m.count > 1 ? m.count + ' car parks' : nm + (s.h ? ', ' + s.h + ' m' : '') + (s.hours ? ', ' + s.hours : '');
       if (s.about) { L.popup({ className: 'sympop symabout', closeButton: true, maxWidth: 280, offset: [0, -12], autoPanPadding: [30, 80] }).setLatLng(m.getLatLng()).setContent('<b>' + esc(nm) + '</b><p>' + esc(s.about) + '</p>').openOn(map); return; }
       L.popup({ className: 'sympop', closeButton: false, offset: [0, -12], autoPanPadding: [30, 60] }).setLatLng(m.getLatLng()).setContent(esc(label)).openOn(map);
@@ -2270,10 +2322,12 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   const sheet = document.getElementById('sheet'), layersBtn = document.getElementById('layersBtn');
   const settingsSheet = document.getElementById('settingsSheet'), settingsBtn = document.getElementById('settingsBtn');
   function openSheet(open) {
+    if (open && typeof openWx === 'function') openWx(false);
     if (open) openSettings(false);
     sheet.hidden = !open; layersBtn.classList.toggle('on', open); layersBtn.setAttribute('aria-expanded', String(open));
   }
   function openSettings(open) {
+    if (open && typeof openWx === 'function') openWx(false);
     if (open && !sheet.hidden) { sheet.hidden = true; layersBtn.classList.remove('on'); layersBtn.setAttribute('aria-expanded', 'false'); }
     settingsSheet.hidden = !open; settingsBtn.classList.toggle('on', open); settingsBtn.setAttribute('aria-expanded', String(open));
   }
@@ -3241,6 +3295,17 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     if (gap < 0) { sun.textContent = 'Back about ' + hhmm(finish) + ', ' + (-gap) + ' min after sunset (' + hhmm(sunset) + ')'; sun.className = 'sunwarn'; }
     else if (gap < 30) { sun.textContent = 'Back about ' + hhmm(finish) + ', only ' + gap + ' min before sunset (' + hhmm(sunset) + ')'; sun.className = 'sunwarn'; }
     else { sun.textContent = 'Back about ' + hhmm(finish) + ', sunset ' + hhmm(sunset); sun.className = 'sunok'; }
+    // vehicle gates lock when the park closes
+    const ph = parkHours(start), gRow = document.getElementById('gateRow'), gWarn = document.getElementById('sGateWarn'), gLine = document.getElementById('sGate');
+    if (!ph) { gLine.textContent = 'The park is closed on 25 December: vehicle gates stay locked'; gLine.className = 'sunwarn'; gWarn.textContent = gLine.textContent; gRow.hidden = false; }
+    else {
+      const lock = new Date(start); lock.setHours(ph.close, 0, 0, 0);
+      const gg = Math.round((lock - finish) / 60000);
+      gLine.textContent = 'Park open ' + ampm(ph.open) + ' to ' + ampm(ph.close) + ': vehicle gates lock at ' + ampm(ph.close); gLine.className = gg < 30 ? 'sunwarn' : 'sunok';
+      if (gg < 0) gWarn.textContent = 'Back about ' + hhmm(finish) + ', ' + (-gg) + ' min after the gates lock at ' + ampm(ph.close);
+      else if (gg < 30) gWarn.textContent = 'Back about ' + hhmm(finish) + ', only ' + gg + ' min before the gates lock at ' + ampm(ph.close);
+      gRow.hidden = gg >= 30;
+    }
     renderHills(start, sunset);
   }
 
@@ -3796,7 +3861,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     const fly = (x, y) => () => flyTo(x, y);
     LABELS.forEach(lb => add(lb.t.join(' '), 'Your name', fly(lb.x, lb.y)));
     OFFICIAL_SYM.forEach(o => add(o.t.join(' '), KIND_WORD[o.k] || 'Place', fly(o.sx || o.x, o.sy || o.y)));
-    SYMBOLS.forEach(s => add(s.n || SYMBOL_NAMES[s.k], SYMBOL_NAMES[s.k], fly(s.x, s.y)));
+    SYMBOLS.filter(s => s.k !== 'gate' || s.gate === 'vehicle').forEach(s => add(s.k === 'gate' ? 'Vehicle gate' : s.n || SYMBOL_NAMES[s.k], SYMBOL_NAMES[s.k], fly(s.x, s.y)));
     loadSaved().forEach(r => add(r.name, 'Saved route', () => { applyRecord(r); setMode('plan'); }));
     loadTracks().forEach(tr => add(tr.name, 'Recording', () => showTrack(tr)));
     loadNotes().forEach(n => add(n.text.length > 50 ? n.text.slice(0, 50) + '…' : n.text, 'Note', fly(n.x, n.y)));
@@ -4364,6 +4429,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   }
   const skinSheet = document.getElementById('skinSheet'), skinBtn = document.getElementById('skinBtn');
   function openSkins(open) {
+    if (open && typeof openWx === 'function') openWx(false);
     if (open) { openSheet(false); openSettings(false); }
     skinSheet.hidden = !open; skinBtn.classList.toggle('on', open); skinBtn.setAttribute('aria-expanded', String(open));
   }
@@ -4420,6 +4486,109 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     map.fitBounds(bounds);
     toast('Map reset to its defaults.', 2500);
   }
+
+  // ================= weather (Open-Meteo, free, no account) =================
+  // three spots at different heights; the forecast is adjusted to each spot's height
+  const WX_SPOTS = [
+    { id: 'car', name: 'Car park', sub: 'by the café', lat: 54.09763, lon: -6.1877, el: 39 },
+    { id: 'forest', name: 'Forest', sub: 'Fiddler’s Green', lat: 54.08856, lon: -6.18571, el: 124 },
+    { id: 'hill', name: 'Hilltop', sub: 'Slieve Martin', lat: 54.09396, lon: -6.16479, el: 484 }
+  ];
+  const WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=' + WX_SPOTS.map(s => s.lat).join(',') + '&longitude=' + WX_SPOTS.map(s => s.lon).join(',') +
+    '&elevation=' + WX_SPOTS.map(s => s.el).join(',') +
+    '&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day' +
+    '&wind_speed_unit=mph&timezone=Europe%2FLondon&timeformat=unixtime&forecast_days=3';
+  const WX_HOURS = 7;                       // this hour and the next six
+  const wx = { data: null, fetched: 0, failed: false, busy: false, spot: 'car' };
+  try { const c = JSON.parse(localStorage.getItem('kilbroney.weather') || 'null'); if (c && Array.isArray(c.data)) { wx.data = c.data; wx.fetched = c.fetched; } } catch (e) {}
+  try { const s = localStorage.getItem('kilbroney.wxspot'); if (WX_SPOTS.some(p => p.id === s)) wx.spot = s; } catch (e) {}
+  const WX_SUN = '<g fill="#f3c14b" stroke="#e0a22a" stroke-width="1"><circle cx="12" cy="12" r="4.2"/></g><g stroke="#e0a22a" stroke-width="1.8" stroke-linecap="round"><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></g>';
+  const WX_MOON = '<path d="M15.5 3.5a8.5 8.5 0 1 0 5 13.6A7 7 0 0 1 15.5 3.5z" fill="#cfd8e6" stroke="#9aa8bd" stroke-width="1"/>';
+  const WX_CLOUD = (dx = 0, dy = 0, op = 1) => '<path transform="translate(' + dx + ' ' + dy + ')" d="M7 19h10.5a4 4 0 0 0 .4-7.98A5.6 5.6 0 0 0 7.1 11.3 3.9 3.9 0 0 0 7 19z" fill="currentColor" fill-opacity="' + (0.28 * op) + '" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>';
+  const WX_SMALLSUN = '<g transform="translate(-3.5 -4) scale(.75)">' + WX_SUN + '</g>', WX_SMALLMOON = '<g transform="translate(-2.5 -3) scale(.7)">' + WX_MOON + '</g>';
+  const WX_DROPS = n => '<g stroke="#4aa3df" stroke-width="1.8" stroke-linecap="round">' + [[8, 20.5], [12, 21.5], [16, 20.5]].slice(0, n).map(([x, y]) => '<path d="M' + x + ' ' + y + 'l-1 2"/>').join('') + '</g>';
+  function wxIcon(code, day) {
+    const svg = inner => '<svg viewBox="0 0 24 24" aria-hidden="true">' + inner + '</svg>';
+    const up = 'translate(0 -2.5)', cl = '<g transform="' + up + '">' + WX_CLOUD() + '</g>';
+    if (code === 0) return svg(day ? WX_SUN : WX_MOON);
+    if (code === 1 || code === 2) return svg((day ? WX_SMALLSUN : WX_SMALLMOON) + WX_CLOUD(1.5, code === 1 ? 2.5 : 1, code === 1 ? .6 : 1));
+    if (code === 3) return svg(WX_CLOUD(0, -1));
+    if (code === 45 || code === 48) return svg('<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 9h16M3 13h18M5 17h14"/></g>');
+    if (code >= 51 && code <= 57) return svg(cl + '<g fill="#4aa3df"><circle cx="8.5" cy="20.5" r="1"/><circle cx="12.5" cy="21.5" r="1"/><circle cx="16.5" cy="20.5" r="1"/></g>');
+    if ((code >= 61 && code <= 67)) return svg(cl + WX_DROPS(code >= 65 ? 3 : 2));
+    if (code >= 80 && code <= 82) return svg((day ? WX_SMALLSUN : WX_SMALLMOON) + '<g transform="translate(1.5 -1)">' + WX_CLOUD() + '</g>' + WX_DROPS(code >= 81 ? 3 : 2));
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return svg(cl + '<g fill="currentColor"><circle cx="8" cy="20.6" r="1.1"/><circle cx="12" cy="22" r="1.1"/><circle cx="16" cy="20.6" r="1.1"/></g>');
+    if (code >= 95) return svg(cl + '<path d="M12.5 16l-2.5 4h3l-1.5 3.5" fill="none" stroke="#f3c14b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>');
+    return svg(WX_CLOUD());
+  }
+  const WX_WORDS = { 0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Cloudy', 45: 'Fog', 48: 'Freezing fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle', 56: 'Freezing drizzle', 57: 'Freezing drizzle',
+    61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 66: 'Freezing rain', 67: 'Freezing rain', 71: 'Light snow', 73: 'Snow', 75: 'Heavy snow', 77: 'Snow grains',
+    80: 'Light showers', 81: 'Showers', 82: 'Heavy showers', 85: 'Snow showers', 86: 'Heavy snow showers', 95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Thunderstorm with hail' };
+  const wxClock = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  const wxWhen = t => { const d = new Date(t), now = new Date(); return (d.toDateString() === now.toDateString() ? '' : d.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ') + wxClock(t); };
+  // the hours to show for one spot: this hour onwards, from whatever forecast we have
+  function wxRows(i) {
+    const h = wx.data && wx.data[i] && wx.data[i].hourly; if (!h || !h.time) return [];
+    const from = Math.floor(Date.now() / 3600000) * 3600, rows = [];
+    for (let k = 0; k < h.time.length && rows.length < WX_HOURS; k++) {
+      if (h.time[k] < from) continue;
+      rows.push({ t: h.time[k] * 1000, temp: h.temperature_2m[k], feel: h.apparent_temperature[k], pp: h.precipitation_probability[k], mm: h.precipitation[k], code: h.weather_code[k],
+        cloud: h.cloud_cover[k], wind: h.wind_speed_10m[k], gust: h.wind_gusts_10m[k], dir: h.wind_direction_10m[k], day: h.is_day[k] === 1 });
+    }
+    return rows;
+  }
+  const wxDeg = v => v == null || isNaN(v) ? '–' : Math.round(v) + '°';
+  function wxButton() {
+    const i = WX_SPOTS.findIndex(s => s.id === wx.spot), r = wxRows(i)[0], b = document.getElementById('wxBtn');
+    document.getElementById('wxBtnIcon').innerHTML = r ? wxIcon(r.code, r.day) : wxIcon(3, true);
+    document.getElementById('wxBtnTemp').textContent = r ? wxDeg(r.temp) : '–';
+    b.classList.toggle('wxold', !r || wx.failed);
+    b.setAttribute('aria-label', 'Weather forecast' + (r ? ': ' + (WX_WORDS[r.code] || '') + ', ' + Math.round(r.temp) + ' degrees at the ' + WX_SPOTS[i].name.toLowerCase() : ''));
+  }
+  function wxRender() {
+    wxButton();
+    const sheet = document.getElementById('wxSheet'); if (sheet.hidden) return;
+    document.getElementById('wxTabs').innerHTML = WX_SPOTS.map(s => '<button role="tab" data-spot="' + s.id + '" aria-selected="' + (s.id === wx.spot) + '">' + s.name + '<small>' + s.el + ' m</small></button>').join('');
+    document.querySelectorAll('#wxTabs button').forEach(b => b.onclick = () => { wx.spot = b.dataset.spot; try { localStorage.setItem('kilbroney.wxspot', wx.spot); } catch (e) {} wxRender(); });
+    const st = document.getElementById('wxStatus'), body = document.getElementById('wxBody'), i = WX_SPOTS.findIndex(s => s.id === wx.spot), rows = wxRows(i);
+    const where = WX_SPOTS[i].sub.charAt(0).toUpperCase() + WX_SPOTS[i].sub.slice(1) + ', ' + WX_SPOTS[i].el + ' m · ';
+    if (wx.busy && !wx.data) st.textContent = where + 'Getting the forecast…';
+    else if (wx.failed) st.innerHTML = where + '<span class="wxns">No signal</span>' + (wx.fetched ? ' · showing the forecast from ' + wxWhen(wx.fetched) : '');
+    else st.textContent = where + (wx.fetched ? 'Updated ' + wxWhen(wx.fetched) : '');
+    if (!rows.length) { body.innerHTML = '<p class="wxstatus">' + (wx.data ? 'The saved forecast has run out. It will update when you have signal.' : wx.failed ? 'No forecast saved yet. It will appear when you have signal.' : '') + '</p>'; return; }
+    const arrow = d => '<svg class="wxarrow" viewBox="0 0 10 10" style="transform:rotate(' + Math.round(d + 180) + 'deg)" aria-hidden="true"><path d="M5 0.5 8.5 9 5 7 1.5 9z" fill="currentColor"/></svg>';
+    body.innerHTML = '<table class="wxtable"><thead><tr><th></th><th></th><th>Temp<br>feels</th><th>Rain</th><th>Wind<br>gusts</th></tr></thead><tbody>' + rows.map((r, k) =>
+      '<tr><td>' + (k === 0 ? 'Now' : wxClock(r.t)) + '</td>' +
+      '<td class="wxic" title="' + (WX_WORDS[r.code] || '') + '">' + wxIcon(r.code, r.day) + '<small>' + Math.round(r.cloud) + '% cloud</small></td>' +
+      '<td><b>' + wxDeg(r.temp) + '</b><small>feels ' + wxDeg(r.feel) + '</small></td>' +
+      '<td' + (r.pp >= 50 ? ' class="wxwet"' : '') + '>' + Math.round(r.pp) + '%<small>' + (r.mm > 0 ? (r.mm < 0.1 ? '<0.1' : r.mm.toFixed(1)) + ' mm' : 'dry') + '</small></td>' +
+      '<td>' + Math.round(r.wind) + ' mph' + arrow(r.dir) + '<small>gusts ' + Math.round(r.gust) + '</small></td></tr>').join('') + '</tbody></table>';
+  }
+  async function wxFetch(force) {
+    if (wx.busy) return; if (!force && wx.data && Date.now() - wx.fetched < 30 * 60000 && !wx.failed) return;
+    wx.busy = true; wxRender();
+    try {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 12000);
+      const res = await fetch(WX_URL, { signal: ctl.signal, cache: 'no-store' }); clearTimeout(timer);
+      if (!res.ok) throw new Error('weather server replied ' + res.status);
+      const j = await res.json(), arr = Array.isArray(j) ? j : [j];
+      if (arr.length !== WX_SPOTS.length || !arr.every(a => a.hourly && a.hourly.time)) throw new Error('unexpected weather reply');
+      wx.data = arr.map(a => ({ hourly: a.hourly })); wx.fetched = Date.now(); wx.failed = false;
+      try { localStorage.setItem('kilbroney.weather', JSON.stringify({ fetched: wx.fetched, data: wx.data })); } catch (e) {}
+    } catch (e) { wx.failed = true; }
+    wx.busy = false; wxRender();
+  }
+  function openWx(open) {
+    const sh = document.getElementById('wxSheet'), b = document.getElementById('wxBtn');
+    if (open) { openSheet(false); openSettings(false); if (typeof openSkins === 'function') openSkins(false); }
+    sh.hidden = !open; b.setAttribute('aria-expanded', String(open));
+    if (open) { wxRender(); wxFetch(Date.now() - wx.fetched > 2 * 60000); }   // opening the card checks for a newer forecast (and finds out if there's no signal)
+  }
+  document.getElementById('wxBtn').onclick = () => openWx(document.getElementById('wxSheet').hidden);
+  document.getElementById('closeWx').onclick = () => openWx(false);
+  wxButton(); wxFetch(false);
+  setInterval(() => { if (document.visibilityState === 'visible') { wxFetch(false); wxRender(); } }, 5 * 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { wxFetch(false); wxRender(); } });
 
   // ================= start =================
   const savedBg = load();
