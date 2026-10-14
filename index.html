@@ -1984,18 +1984,24 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     let defs = svg.querySelector('defs'); if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs'); svg.prepend(defs); }
     const dark = isDark() || skin === 'cyberpunk', cel = skin === 'celshaded';
     const ink = dark ? '#cfe8c8' : '#1f5a2c', ink2 = dark ? '#e6f5b0' : '#4f7d1c', fe = cel ? '#000' : dark ? '#d9a066' : '#8a5a2b';
+    const sym = dark ? '#a9c8a0' : '#3f7a44', symA = dark ? 0.3 : 0.24;
+    const osOwn = skin === 'os';   // the OS style theme draws its own conifer trees, so ours stay out of its way
+    const osC = (x, y) => osOwn ? '' : '<path d="M' + x + ' ' + (y - 4.5) + ' L' + (x + 2.6) + ' ' + (y + 0.8) + ' L' + (x - 2.6) + ' ' + (y + 0.8) + ' Z M' + x + ' ' + (y + 0.8) + ' V' + (y + 3) + '" fill="' + sym + '" stroke="' + sym + '" stroke-width="0.9" opacity="' + symA + '"/>';
+    const osB = (x, y) => '<circle cx="' + x + '" cy="' + (y - 1.8) + '" r="2.4" fill="' + sym + '" opacity="' + symA + '"/><path d="M' + x + ' ' + (y + 0.6) + ' V' + (y + 3.2) + '" stroke="' + sym + '" stroke-width="0.9" opacity="' + symA + '"/>';
+    const osS = (x, y) => '<path d="M' + (x - 2) + ' ' + y + ' q2 -3 4 0" fill="none" stroke="' + sym + '" stroke-width="0.9" opacity="' + symA + '"/>';
     const pat = (id, w, inner) => '<pattern id="' + id + '" patternUnits="userSpaceOnUse" width="' + w + '" height="' + w + '">' + inner + '</pattern>';
     defs.innerHTML =
-      pat('wpC', 22, '<path d="M6 4 L10 12 L2 12 Z M17 13 L21 21 L13 21 Z" fill="' + ink + '" opacity=".55"/>') +
-      pat('wpB', 24, '<circle cx="7" cy="8" r="3.4" fill="none" stroke="' + ink2 + '" stroke-width="1.3" opacity=".75"/><path d="M7 11.4v3" stroke="' + ink2 + '" stroke-width="1.2" opacity=".75"/><circle cx="18" cy="19" r="3.4" fill="none" stroke="' + ink2 + '" stroke-width="1.3" opacity=".75"/><path d="M18 22.4v1.6" stroke="' + ink2 + '" stroke-width="1.2" opacity=".75"/>') +
-      pat('wpM', 24, '<path d="M6 4 L10 12 L2 12 Z" fill="' + ink + '" opacity=".55"/><circle cx="18" cy="18" r="3.4" fill="none" stroke="' + ink2 + '" stroke-width="1.3" opacity=".75"/>') +
-      pat('wpS', 10, '<circle cx="3" cy="3" r="1.1" fill="' + ink2 + '" opacity=".6"/><circle cx="8" cy="8" r="1.1" fill="' + ink2 + '" opacity=".6"/>') +
+      // Ordnance Survey style: small, light, loosely scattered symbols (pointed tree = conifer, round 'lollipop' tree = broadleaf)
+      pat('wpC', 48, osC(10, 11) + osC(34, 19) + osC(19, 37)) +
+      pat('wpB', 48, osB(9, 10) + osB(33, 18) + osB(18, 36)) +
+      pat('wpM', 48, osC(10, 11) + osB(33, 18) + osB(18, 36)) +
+      pat('wpS', 36, osS(7, 9) + osS(25, 16) + osS(14, 29)) +
       (cel
         ? pat('wpFR', 12, '<path d="M0 12 L12 0" stroke="#000" stroke-width="1" opacity=".35"/><circle cx="3" cy="3" r="1.3" fill="#000" opacity=".6"/>') +
           pat('wpFP', 14, '<path d="M0 14 L14 0" stroke="#000" stroke-width="1" opacity=".3"/><path d="M9 3 L11 7 L7 7 Z" fill="#000" opacity=".55"/>')
-        : pat('wpFR', 12, '<rect width="12" height="12" fill="' + (dark ? '#3b2a1a' : '#e9d6b4') + '" opacity=".75"/><path d="M0 12 L12 0" stroke="' + fe + '" stroke-width="1.2" opacity=".7"/><circle cx="3" cy="3" r="1.2" fill="' + fe + '"/>') +
-          pat('wpFP', 14, '<rect width="14" height="14" fill="' + (dark ? '#2f3a1e' : '#e3e6c0') + '" opacity=".7"/><path d="M0 14 L14 0" stroke="' + fe + '" stroke-width="1" opacity=".5"/><path d="M9 3 L11 7 L7 7 Z" fill="' + ink2 + '" opacity=".8"/>'));
-    felledPolys.forEach(p => p.setStyle({ color: fe, weight: cel ? 2.6 : 1.4, dashArray: cel ? '7 4' : '4 3' }));
+        : pat('wpFR', 14, '<rect width="14" height="14" fill="' + (dark ? '#3b2a1a' : '#e9d6b4') + '" opacity=".38"/><path d="M0 14 L14 0" stroke="' + fe + '" stroke-width="0.8" opacity=".28"/><circle cx="4" cy="4" r="0.9" fill="' + fe + '" opacity=".45"/>') +
+          pat('wpFP', 16, '<rect width="16" height="16" fill="' + (dark ? '#2f3a1e' : '#e3e6c0') + '" opacity=".34"/><path d="M0 16 L16 0" stroke="' + fe + '" stroke-width="0.8" opacity=".22"/><path d="M10 4 L11.6 7 L8.4 7 Z" fill="' + ink2 + '" opacity=".4"/>'));
+    felledPolys.forEach(p => p.setStyle({ color: fe, opacity: cel ? 0.7 : 0.45, weight: cel ? 2 : 1, dashArray: cel ? '7 4' : '3 3' }));
   }
   woodRend.on('add', woodRestyle);
 
