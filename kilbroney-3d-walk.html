@@ -90,6 +90,7 @@
   .rm { font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
   .menu .plain { margin-top: auto; background: rgba(255,255,255,.1); border: 1px solid var(--glass-edge); border-radius: 12px; padding: 12px 16px; font-size: 15px; font-weight: 700; text-align: center; }
   .menu .plain { margin-top: 20px; }
+  .menu .menumap { align-self: flex-start; margin: -6px 0 14px; background: rgba(255,255,255,.1); border: 1px solid var(--glass-edge); border-radius: 11px; padding: 9px 13px; font-size: 14px; font-weight: 700; }
   .menu button:focus-visible, .tourbar button:focus-visible, .done button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .tourbar { position: fixed; z-index: 6; right: calc(14px + env(safe-area-inset-right, 0px)); top: calc(14px + env(safe-area-inset-top, 0px));
              display: flex; align-items: center; gap: 4px; background: var(--glass); border: 1px solid var(--glass-edge); border-radius: 14px; padding: 5px 5px 5px 14px;
@@ -153,11 +154,13 @@
   <button id="land" hidden title="Land (L)">Land</button>
   <button id="home">Back to start</button>
   <button id="exploreMenu">Menu</button>
+  <button class="tomap" title="Back to the map">← Map</button>
 </div>
 <div class="manual updown" id="updown" hidden><button id="up" aria-label="Climb">▲</button><button id="down" aria-label="Sink">▼</button></div>
 <div class="manual stick" id="stick" aria-hidden="true"><div class="knob" id="knob"></div></div>
 <div class="manual help" id="help"></div>
 <section class="menu" id="menu" aria-label="Kilbroney Forest in 3D" hidden>
+  <button class="tomap menumap">← Back to the map</button>
   <h1>Kilbroney Forest<span>in 3D</span></h1>
   <button class="big" id="goFly"><span class="bt">Grand flyover</span><span class="bs">A sweep over the whole park, about a minute and a half</span></button>
   <h2>Preset routes</h2>
@@ -166,7 +169,7 @@
 </section>
 <div class="tourbar" id="tourbar" hidden>
   <span class="tn" id="tourname"></span>
-  <button id="pause">Pause</button><button id="takeover">Take control</button><button id="tomenu">Menu</button>
+  <button class="tomap" title="Back to the map">← Map</button><button id="pause">Pause</button><button id="takeover">Take control</button><button id="tomenu">Menu</button>
   <div class="prog" id="progwrap"><div id="tourprog"></div></div>
 </div>
 <section class="routecard" id="routecard" hidden aria-live="polite">
@@ -190,7 +193,7 @@
 <div class="caption" id="caption"></div>
 <section class="done" id="done" hidden>
   <div class="dt" id="donetitle"></div><div class="dx" id="donetext"></div>
-  <div class="db"><button id="replay">Watch again</button><button id="doneExplore">Explore from here</button><button id="doneMenu">Menu</button></div>
+  <div class="db"><button id="replay">Watch again</button><button id="doneExplore">Explore from here</button><button id="doneMenu">Menu</button><button class="tomap">← Map</button></div>
 </section>
 
 
@@ -1037,7 +1040,7 @@ goHome();
 const rootEl = document.documentElement;
 let state = 'menu';
 const $ = id => document.getElementById(id);
-const fmtKm = m => (m / 1000).toFixed(1) + ' km';
+const fmtKm = m => m < 1000 ? Math.round(m / 10) * 10 + ' m' : (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';   // same as the map
 const smooth = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 const lerp = (a, b, t) => a + (b - a) * t;
 const tmpV = new THREE.Vector3(), tmpT = new THREE.Vector3();
@@ -1127,15 +1130,18 @@ function flyoverFrame(dt) {
 function startFlyover() { setState('flyover'); tourT = 0; $('tourname').textContent = 'Grand flyover'; }
 
 // ---------- preset routes ----------
-const ROUTES = D.routes.map(r => {
+const mkRoute = r => {
   const x = [], z = [], hz = [], cum = [0];
   for (let i = 0; i < r.pts.length; i += 3) { x.push(toX(r.pts[i])); z.push(toZ(r.pts[i + 1])); hz.push(r.pts[i + 2]); }
   for (let i = 1; i < x.length; i++) cum.push(cum[i - 1] + Math.hypot(x[i] - x[i - 1], z[i] - z[i - 1]));
   // climb so far, same method as the map: 1 m dead band
   const upTo = [0]; let ref = hz[0], up = 0;
   for (let i = 1; i < hz.length; i++) { if (hz[i] > ref + 1) { up += hz[i] - ref; ref = hz[i]; } else if (hz[i] < ref - 1) ref = hz[i]; upTo.push(up); }
+  // a line from the map: match the climb so far to the map's own figure (the slimmed-down line adds up slightly differently)
+  if (r.kind && r.climb && up > 0) { const f = r.climb / up; for (let i = 0; i < upTo.length; i++) upTo[i] *= f; up = r.climb; }
   return { name: r.name, dist: r.dist, climb: r.climb, x, z, hz, cum, upTo, len: cum[cum.length - 1], up };
-});
+};
+const ROUTES = D.routes.map(mkRoute);
 function routeAt(R, s) {
   s = Math.max(0, Math.min(R.len, s));
   let lo = 1, hi = R.cum.length - 1;
@@ -1230,13 +1236,15 @@ function startRoute(idx) {
   setState('route');
   buildRouteGfx(R);
   const stops = findHighlights(R);
-  const v = R.len / (52 + R.len / 1000 * 5.5);    // about 1.5 to 2.5 minutes of travel
+  // about 1.5 to 2.5 minutes of travel for a full route; short paths from the map's path cards go quicker
+  const v = R.len / Math.min(52 + R.len / 1000 * 5.5, 8 + R.len / 1000 * 24);
+  const short = R.len < 1500, OV = short ? 3 : OVER, SW = short ? 2.5 : SWOOP, OU = short ? 3.5 : OUTRO;
   // timeline: overview, swoop down, one steady move along the whole route (easing in and out), pull back up
   const phases = []; let t = 0;
   const RAMP = 4;
-  phases.push({ k: 'over', t0: t, t1: t += OVER }); phases.push({ k: 'swoop', t0: t, t1: t += SWOOP });
+  phases.push({ k: 'over', t0: t, t1: t += OV }); phases.push({ k: 'swoop', t0: t, t1: t += SW });
   phases.push({ k: 'move', t0: t, t1: t += R.len / v + RAMP, r: RAMP });
-  phases.push({ k: 'outro', t0: t, t1: t += OUTRO });
+  phases.push({ k: 'outro', t0: t, t1: t += OU });
   // the whole-route view
   let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
   R.x.forEach((x, i) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, R.z[i]); z1 = Math.max(z1, R.z[i]); });
@@ -1407,7 +1415,37 @@ function tourFrame(dt) {
 
 $('doneExplore').addEventListener('click', takeControl);
 $('doneMenu').addEventListener('click', toMenu);
-setState('menu');
+
+// ---------- opened from the map: #k=route|path&n=name&d=metres&c=climb&r=line ----------
+// r is the line as east/north/height in the forest's metres (0.5 m, 0.5 m, 1 m steps), each value the change from the
+// one before, zigzagged and written 5 bits per character in URL-safe base64 (a character >= 32 means more follows)
+function fromMap() {
+  try {
+    const q = new URLSearchParams(location.hash.slice(1));
+    const r = q.get('r'); if (!r) return null;
+    const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', vals = [];
+    let v = 0, sh = 0;
+    for (const ch of r) { const c = A.indexOf(ch); if (c < 0) return null; v |= (c & 31) << sh; sh += 5; if (c < 32) { vals.push(v & 1 ? -(v + 1) / 2 : v / 2); v = 0; sh = 0; } }
+    if (vals.length < 6 || vals.length % 3) return null;
+    const pts = []; let e = 0, n = 0, h = 0;
+    for (let i = 0; i < vals.length; i += 3) { e += vals[i]; n += vals[i + 1]; h += vals[i + 2]; pts.push(e / 2, n / 2, h); }
+    return { name: q.get('n') || 'Your route', dist: +q.get('d') || 0, climb: +q.get('c') || 0, pts, kind: q.get('k') };
+  } catch (e) { return null; }
+}
+// back to the map: the map saved its place before coming here, so going back reopens the same card
+function toMap() {
+  let fromIt = false; try { fromIt = !!sessionStorage.getItem('kilbroney.session'); } catch (e) {}
+  if (fromIt && history.length > 1) { history.back(); const t = setTimeout(() => { location.href = './'; }, 800); addEventListener('pagehide', () => clearTimeout(t), { once: true }); }
+  else location.href = './';
+}
+document.querySelectorAll('.tomap').forEach(b => b.addEventListener('click', toMap));
+addEventListener('pageshow', e => { if (e.persisted && state === 'route' && RT) startRoute(RT.idx); });
+const MAPROUTE = fromMap();
+if (MAPROUTE) {
+  const R = mkRoute(MAPROUTE);
+  if (!R.dist) R.dist = R.len;
+  ROUTES.push(R); startRoute(ROUTES.length - 1);
+} else setState('menu');
 
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 camera.position.set(pos.x, heightXZ(pos.x, pos.z) + 1.7, pos.z); updateTiles(true);

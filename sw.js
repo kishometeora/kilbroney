@@ -1,10 +1,10 @@
 // Keeps a full copy of the map on the phone so it works in the forest without signal.
 // Change VERSION whenever the map is updated so phones pick up the new copy.
-const VERSION = 'kilbroney-20261014-2239';
+const VERSION = 'kilbroney-20261015-1748';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
-  './bg/terrain.jpg', './bg/terrain-dark.jpg', './bg/landshade.jpg', './bg/landshade-dark.jpg', './bg/eox-2024.jpg', './bg/context.jpg', './bg/context-dark.jpg', './bg/context-wide.jpg', './bg/context-wide-dark.jpg', './bg/celshade.webp', './bg/eightbit.png', './bg/eightbit-rot.png', './bg/eightbit.js', './bg/blockworld.webp'
+  './bg/terrain.jpg', './bg/terrain-dark.jpg', './bg/landshade.jpg', './bg/landshade-dark.jpg', './bg/eox-2024.jpg', './bg/context.jpg', './bg/context-dark.jpg', './bg/context-wide.jpg', './bg/context-wide-dark.jpg', './bg/celshade.webp', './bg/eightbit.png', './bg/eightbit-rot.png', './bg/eightbit.js', './bg/blockworld.webp', './bg/fantasy-leather.jpg', './bg/fantasy-stain.webp', './bg/fantasy-burn.webp'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -15,7 +15,10 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-  const isPage = req.mode === 'navigate' || req.url.endsWith('/index.html');
+  const path = new URL(req.url).pathname;
+  // only the map itself is saved as the map; other pages on the site (such as the 3D view) go straight to the network
+  if (req.mode === 'navigate' && !(path.endsWith('/') || path.endsWith('/index.html'))) return;
+  const isPage = path.endsWith('/') || path.endsWith('/index.html');
   if (isPage) {
     // the page itself: try for the newest version, fall back to the saved copy when there's no signal
     e.respondWith(Promise.race([
