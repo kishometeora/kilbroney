@@ -1629,7 +1629,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   // ================= crash recorder =================
   // Notes the last few things done on the map. If the page ever restarts unexpectedly (the iPhone or Safari reloading it),
   // the next open shows "The map closed unexpectedly" with a Copy details button, so the cause can be tracked down.
-  const CR_KEY = 'kilbroney.crashlog', CR_LIST = 'kilbroney.crashes', BUILD = '20261015-2201';
+  const CR_KEY = 'kilbroney.crashlog', CR_LIST = 'kilbroney.crashes', BUILD = '20261015-2241';
   const crT0 = Date.now();
   let crLog = { alive: true, beat: crT0, start: crT0, build: BUILD, crumbs: [] };
   const crPrev = (() => { try { return JSON.parse(localStorage.getItem(CR_KEY) || 'null'); } catch (e) { return null; } })();
@@ -4356,8 +4356,6 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
 
   // ================= 3D view: opens the 3D page on this route or path; its ← Map button comes back to the same card =================
   const THREED = 'kilbroney-3d-walk.html';
-  // phones and tablets don't get the 3D button: the home-screen app on iPhone runs out of memory after a 3D trip
-  const NO_3D = matchMedia('(pointer: coarse)').matches;
   // map px -> metres east and north, the 3D page's ground measurements (the reverse of toPx)
   function pxToEN(x, y) { const u = (x - GEO.tx) / GEO.s, v = (y - GEO.ty) / GEO.s; return [cosT * u + sinT * v, sinT * u - cosT * v]; }
   function line3d(nodes) {
@@ -4393,8 +4391,8 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   function sync3d() {
     const off = !navigator.onLine;
     [i3d, a3d].forEach(b => { b.classList.toggle('off', off); b.setAttribute('aria-disabled', String(off)); b.title = off ? '3D needs a signal' : b.id === 'i3d' ? 'See this path in 3D' : 'Fly along this route in 3D'; });
-    i3d.hidden = NO_3D || nav.active;          // not on phones, not while walking a route
-    a3d.hidden = NO_3D || nav.active || !geo;
+    i3d.hidden = nav.active;          // not while walking a route
+    a3d.hidden = nav.active || !geo;
   }
   addEventListener('online', sync3d); addEventListener('offline', sync3d); setInterval(sync3d, 600); sync3d();
   document.querySelectorAll('#orient .chip').forEach(c => c.onclick = () => {
