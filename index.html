@@ -1629,7 +1629,7 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   // ================= crash recorder =================
   // Notes the last few things done on the map. If the page ever restarts unexpectedly (the iPhone or Safari reloading it),
   // the next open shows "The map closed unexpectedly" with a Copy details button, so the cause can be tracked down.
-  const CR_KEY = 'kilbroney.crashlog', CR_LIST = 'kilbroney.crashes', BUILD = '20261015-2130';
+  const CR_KEY = 'kilbroney.crashlog', CR_LIST = 'kilbroney.crashes', BUILD = '20261015-2201';
   const crT0 = Date.now();
   let crLog = { alive: true, beat: crT0, start: crT0, build: BUILD, crumbs: [] };
   const crPrev = (() => { try { return JSON.parse(localStorage.getItem(CR_KEY) || 'null'); } catch (e) { return null; } })();
@@ -1848,18 +1848,44 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     putW(srcW); put(src);
   }
   const rotatedCache = {};
-  function makeOverlay(url, r, opts) {
-    if (!ROTATED) return L.imageOverlay(url, L.latLngBounds(ll(r.x0, r.y0), ll(r.x1, r.y1)), opts);
-    const cs = [[r.x0, r.y0], [r.x1, r.y0], [r.x0, r.y1], [r.x1, r.y1]].map(([x, y]) => disp(x, y));
-    const minX = Math.min(...cs.map(c => c[0])), maxX = Math.max(...cs.map(c => c[0])), minY = Math.min(...cs.map(c => c[1])), maxY = Math.max(...cs.map(c => c[1]));
-    const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'), im = document.createElementNS(NS, 'image');
-    svg.setAttribute('viewBox', minX + ' ' + minY + ' ' + (maxX - minX) + ' ' + (maxY - minY)); svg.setAttribute('preserveAspectRatio', 'none');
-    im.setAttribute('href', url); im.setAttribute('x', r.x0); im.setAttribute('y', r.y0); im.setAttribute('width', r.x1 - r.x0); im.setAttribute('height', r.y1 - r.y0);
-    im.setAttribute('preserveAspectRatio', 'none'); im.setAttribute('transform', 'translate(' + ROX + ' ' + ROY + ') rotate(' + ROT + ')');
-    if (opts.className === 'pixelated') im.style.imageRendering = 'pixelated';
-    svg.appendChild(im);
-    return L.svgOverlay(svg, L.latLngBounds(L.latLng(-minY, minX), L.latLng(-maxY, maxX)), opts);
-  }
+  // Background pictures (the map's background and the surroundings) are drawn into a screen-sized SVG that shows only the part
+  // in view, like the path renderers do. A picture layer sized to the whole map grows with every zoom step (about 173,000 iPhone
+  // pixels wide at zoom 1.5) and the fly animation then makes Safari redraw it every frame, which crashed the iPhone home-screen app.
+  const ViewportImage = L.Renderer.extend({
+    options: { padding: 0.3 },
+    initialize(url, r, opts) {
+      L.Renderer.prototype.initialize.call(this, Object.assign({ padding: 0.3 }, opts || {}));
+      this._url = url; this._r = r; this._cls = (opts && opts.className) || '';
+    },
+    _initContainer() {
+      const NS = 'http://www.w3.org/2000/svg', svg = this._container = document.createElementNS(NS, 'svg'), im = document.createElementNS(NS, 'image'), r = this._r;
+      svg.setAttribute('preserveAspectRatio', 'none');
+      svg.setAttribute('class', ('leaflet-image-layer ' + this._cls).trim());
+      svg.style.pointerEvents = 'none';
+      if (this.options.zIndex != null) svg.style.zIndex = this.options.zIndex;
+      im.setAttribute('href', this._url); im.setAttribute('x', r.x0); im.setAttribute('y', r.y0); im.setAttribute('width', r.x1 - r.x0); im.setAttribute('height', r.y1 - r.y0);
+      im.setAttribute('preserveAspectRatio', 'none');
+      if (ROTATED) im.setAttribute('transform', 'translate(' + ROX + ' ' + ROY + ') rotate(' + ROT + ')');
+      if (this._cls.includes('pixelated')) im.style.imageRendering = 'pixelated';
+      im.addEventListener('error', () => this.fire('error'));
+      svg.appendChild(im);
+    },
+    _destroyContainer() { L.DomUtil.remove(this._container); delete this._container; },
+    _updatePaths() {},
+    _update() {
+      if (this._map._animatingZoom && this._bounds) return;
+      L.Renderer.prototype._update.call(this);
+      const b = this._bounds, size = b.getSize(), c = this._container;
+      c.setAttribute('width', size.x); c.setAttribute('height', size.y);
+      L.DomUtil.setPosition(c, b.min);
+      // the visible part, in the same display coordinates the picture is placed in (x = lng, y = -lat)
+      const nw = this._map.layerPointToLatLng(b.min), se = this._map.layerPointToLatLng(b.max);
+      c.setAttribute('viewBox', [nw.lng, -nw.lat, se.lng - nw.lng, nw.lat - se.lat].join(' '));
+      this.fire('update');
+    },
+    bringToBack() { const p = this._container && this._container.parentNode; if (p && p.firstChild !== this._container) p.insertBefore(this._container, p.firstChild); return this; }
+  });
+  function makeOverlay(url, r, opts) { return new ViewportImage(url, r, opts); }
   const MAP_RECT = { x0: 0, y0: 0, x1: GEO.w, y1: GEO.h };
   const GROW = 270;   // the map reaches 500 m beyond the hand-drawn map on every side (land, terrain and contours; no paths)
   const GROWN_RECT = { x0: -GROW, y0: -GROW, x1: GEO.w + GROW, y1: GEO.h + GROW };
