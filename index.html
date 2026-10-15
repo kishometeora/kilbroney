@@ -4373,7 +4373,9 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
     else { if (!geo) return; nodes = geo.nodes; name = plan.name || 'Your route'; dist = geo.total; climb = geo.up; }
     const q = new URLSearchParams({ k: kind, n: name, d: dist.toFixed(1), c: String(Math.round(climb)) });
     savePlace('3d');
-    location.href = THREED + '#' + q.toString() + '&r=' + line3d(nodes);
+    // replace rather than stack: the iPhone then doesn't keep the whole map parked in memory while the 3D view runs
+    // (the home-screen app runs out of memory holding both); the map reloads on return and reopens this card
+    location.replace(THREED + '#' + q.toString() + '&r=' + line3d(nodes));
   }
   const i3d = document.getElementById('i3d'), a3d = document.getElementById('a3d');
   i3d.onclick = () => go3d('path'); a3d.onclick = () => go3d('route');

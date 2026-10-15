@@ -1432,14 +1432,13 @@ function fromMap() {
     return { name: q.get('n') || 'Your route', dist: +q.get('d') || 0, climb: +q.get('c') || 0, pts, kind: q.get('k') };
   } catch (e) { return null; }
 }
-// back to the map: the map saved its place before coming here, so going back reopens the same card
-function toMap() {
-  let fromIt = false; try { fromIt = !!sessionStorage.getItem('kilbroney.session'); } catch (e) {}
-  if (fromIt && history.length > 1) { history.back(); const t = setTimeout(() => { location.href = './'; }, 800); addEventListener('pagehide', () => clearTimeout(t), { once: true }); }
-  else location.href = './';
-}
+// back to the map: replace this page rather than going back, so the iPhone never keeps the 3D forest and the map in memory
+// together (the home-screen app runs out of memory); the map saved its place before coming here and reopens the same card
+function toMap() { location.replace('./'); }
 document.querySelectorAll('.tomap').forEach(b => b.addEventListener('click', toMap));
-addEventListener('pageshow', e => { if (e.persisted && state === 'route' && RT) startRoute(RT.idx); });
+// leaving: hand the 3D graphics memory straight back; if the browser ever restores this page from its memory, start afresh
+addEventListener('pagehide', () => { try { renderer.dispose(); renderer.forceContextLoss(); } catch (e) {} });
+addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
 const MAPROUTE = fromMap();
 if (MAPROUTE) {
   const R = mkRoute(MAPROUTE);
