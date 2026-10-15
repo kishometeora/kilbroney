@@ -1,10 +1,10 @@
 // Keeps a full copy of the map on the phone so it works in the forest without signal.
 // Change VERSION whenever the map is updated so phones pick up the new copy.
-const VERSION = 'kilbroney-20261015-1938';
+const VERSION = 'kilbroney-20261015-2040';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
-  './bg/terrain.jpg', './bg/terrain-dark.jpg', './bg/landshade.jpg', './bg/landshade-dark.jpg', './bg/eox-2024.jpg', './bg/context.jpg', './bg/context-dark.jpg', './bg/context-wide.jpg', './bg/context-wide-dark.jpg', './bg/celshade.webp', './bg/eightbit.png', './bg/eightbit-rot.png', './bg/eightbit.js', './bg/blockworld.webp', './bg/fantasy-leather.jpg', './bg/fantasy-stain.webp', './bg/fantasy-burn.webp'
+  './bg/terrain.jpg', './bg/terrain-dark.jpg', './bg/landshade.jpg', './bg/landshade-dark.jpg', './bg/eox-2024.jpg', './bg/context.jpg', './bg/context-dark.jpg', './bg/context-wide.jpg', './bg/context-wide-dark.jpg', './bg/eightbit.png', './bg/eightbit-rot.png', './bg/eightbit.js'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
