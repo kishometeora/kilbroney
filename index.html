@@ -2945,8 +2945,12 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
       if (r.width > W * 0.7) br[1] = Math.max(br[1], mr.bottom - r.top + 16);   // card across the bottom (phone)
       else tl[0] = Math.max(tl[0], r.right - mr.left + 16);                    // panel down the side (Mac)
     });
-    map.flyToBounds(L.latLngBounds(latlngs), { paddingTopLeft: tl, paddingBottomRight: br, maxZoom: 1.5, duration: 0.6 });
+    const opts = { paddingTopLeft: tl, paddingBottomRight: br, maxZoom: 1.5 };
+    // phones jump straight there: the fly animation (zoom out, glide, zoom in across the big background pictures) can crash the iPhone home-screen app
+    if (NO_FLY) { map.stop(); map.fitBounds(L.latLngBounds(latlngs), Object.assign(opts, { animate: false })); }
+    else map.flyToBounds(L.latLngBounds(latlngs), Object.assign(opts, { duration: 0.6 }));
   }
+  const NO_FLY = matchMedia('(pointer: coarse)').matches;   // phones and tablets
   const fitSoon = getPts => setTimeout(() => { const p = getPts(); if (p) fitVisible(p); }, 80);
   const routePts = () => geo ? geo.nodes.map(n => ll(NX[n], NY[n])) : null;
 
@@ -3979,7 +3983,8 @@ html, body, button, input, select, textarea, .sheet, .panel, .toast, .searchpill
   }
   let pulseMarker = null;
   function flyTo(x, y) {
-    map.flyTo(ll(x, y), Math.max(map.getZoom(), 0.25), { duration: 0.8 });
+    if (NO_FLY) { map.stop(); map.setView(ll(x, y), Math.max(map.getZoom(), 0.25), { animate: false }); }   // phones: no fly animation (see fitVisible)
+    else map.flyTo(ll(x, y), Math.max(map.getZoom(), 0.25), { duration: 0.8 });
     if (pulseMarker) pulseMarker.remove();
     pulseMarker = L.marker(ll(x, y), { interactive: false, keyboard: false, zIndexOffset: 1500, icon: L.divIcon({ className: '', iconSize: [44, 44], iconAnchor: [22, 22], html: '<div class="pulse"></div>' }) }).addTo(map);
     setTimeout(() => { if (pulseMarker) { pulseMarker.remove(); pulseMarker = null; } }, 4000);
